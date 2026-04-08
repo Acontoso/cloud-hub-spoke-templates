@@ -1,6 +1,6 @@
 # Cloud Hub Spoke Templates
 
-Terraform templates for building an AWS hub/inspection VPC pattern to support Zscaler Cloud Connector integration for cloud networks.
+Terraform templates for building an AWS hub/inspection VPC pattern to support Zscaler Cloud Connector integration for cloud networks. **Soon to extend to other cloud platforms**
 
 ## Overview
 
@@ -27,8 +27,8 @@ terraform/
 		env/
 			terragrunt.hcl
 		modules/
-			appconnector/        # currently empty (scaffold only)
-			cloudconnector/      # currently empty (scaffold only)
+			appconnector/
+			cloudconnector/
 			gwlb/
 			gwlb-endpoint/
 			iam/

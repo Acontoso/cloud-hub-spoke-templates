@@ -1,0 +1,73 @@
+name: Terraform Plan
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Target environment (dev, preprod, prod)"
+        type: string
+        required: true
+
+env:
+  AWS_REGION: ap-southeast-2
+
+permissions:
+      id-token: write 
+      contents: read
+
+concurrency:
+  group: plan-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  terraform-plan:
+    name: Terraform Plan — ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsTerraformRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.10.0"
+
+      - name: Terragrunt Install
+        uses: gruntwork-io/terragrunt-in-action@v3
+        with:
+          tg_version: "0.82.3"
+          opentofu: "1.10.1"
+
+      - name: Terragrunt Plan
+        id: plan
+        working-directory: terraform/aws
+        run: |
+          terragrunt init
+          terragrunt plan \
+            -out="${{ inputs.environment }}.tfplan" \
+            -no-color 2>&1 | tee plan_output.txt
+
+      - name: Write plan to job summary
+        if: always()
+        run: |
+          PLAN=$(cat terraform/aws/plan_output.txt)
+          TRUNCATED=${PLAN:0:60000}
+
+          echo "### Terragrunt Plan — \`${{ inputs.environment }}\`" >> $GITHUB_STEP_SUMMARY
+          echo ""                                                        >> $GITHUB_STEP_SUMMARY
+          echo "| Key | Value |"                                         >> $GITHUB_STEP_SUMMARY
+          echo "|-----|-------|"                                         >> $GITHUB_STEP_SUMMARY
+          echo "| Environment  | \`${{ inputs.environment }}\` |"        >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered by | \`${{ github.actor }}\` |"              >> $GITHUB_STEP_SUMMARY
+          echo ""                                                        >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`hcl"                                               >> $GITHUB_STEP_SUMMARY
+          echo "$TRUNCATED"                                              >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`"                                                  >> $GITHUB_STEP_SUMMARY

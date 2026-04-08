@@ -76,3 +76,8 @@ variable "name_prefix" {
   description = "A prefix to associate to all the network module resources"
   default     = null
 }
+
+variable "cc_service_ips" {
+  type        = list(string)
+  description = "List of Cloud Connector service IPs for GWLB Target Group"
+}

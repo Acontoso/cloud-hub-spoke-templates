@@ -177,3 +177,19 @@ resource "aws_vpc_security_group_egress_rule" "egress_cc_service_all" {
   cidr_ipv4         = "0.0.0.0/0"
   ip_protocol       = "-1"
 }
+
+resource "aws_security_group" "ac_sg" {
+  name        = "${var.name_prefix}-ac-sg"
+  description = "Security group for App Connector interface"
+  vpc_id      = aws_vpc.vpc.id
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  tags = merge(var.tags,
+    { Name = "${var.name_prefix}-ac-sg" }
+  )
+}

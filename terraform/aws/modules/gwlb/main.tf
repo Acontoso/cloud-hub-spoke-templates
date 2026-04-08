@@ -6,7 +6,7 @@ resource "aws_lb_target_group" "gwlb_target_group" {
   port                 = 6081
   protocol             = "GENEVE"
   vpc_id               = aws_vpc.vpc.id
-  target_type          = "instance"
+  target_type          = "ip"
   deregistration_delay = var.deregistration_delay
 
   health_check {
@@ -29,6 +29,12 @@ resource "aws_lb_target_group" "gwlb_target_group" {
     enabled = var.flow_stickiness == "5-tuple" ? false : true
     type    = "source_ip_dest_ip_proto"
   }
+}
+
+resource "aws_lb_target_group_attachment" "gwlb_target_group_attachment" {
+  count            = length(var.cc_service_ips)
+  target_group_arn = aws_lb_target_group.gwlb_target_group.arn
+  target_id        = element(var.cc_service_ips, count.index)
 }
 
 ################################################################################

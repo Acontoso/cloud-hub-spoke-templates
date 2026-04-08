@@ -72,6 +72,20 @@ module "iam" {
   tags        = local.tags
 }
 
+module "cc_vm" {
+  source                     = "./modules/cloudconnector"
+  name_prefix                = var.name_prefix
+  tags                       = local.tags
+  ccvm_instance_type         = var.ccvm_instance_type
+  ebs_encryption_enabled     = var.ebs_encryption_enabled
+  cc_count                   = var.cc_count
+  userdata                   = local.userdata
+  aws_cc_subnet_ids          = module.network.cc_subnet_ids
+  service_interface_sg_id    = module.securitygroups.cc_service_sg_id
+  management_interface_sg_id = module.securitygroups.cc_mgmt_sg_id
+  instance_key               = var.instance_key
+}
+
 module "gwlb" {
   source                = "./modules/gwlb"
   name_prefix           = var.name_prefix
@@ -84,6 +98,7 @@ module "gwlb" {
   cross_zone_lb_enabled = var.cross_zone_lb_enabled
   flow_stickiness       = var.flow_stickiness
   gwlb_name             = var.gwlb_name
+  cc_service_ips        = module.cc_vm.forwarding_ip
 }
 
 module "gwlb_endpoint" {
@@ -93,4 +108,16 @@ module "gwlb_endpoint" {
   aws_cc_subnet_ids = module.network.cc_subnet_ids
   vpc_id            = module.network.vpc_id
   gwlb_arn          = module.gwlb.gwlb_arn
+}
+
+module "appconnector_vm" {
+  source                     = "./modules/appconnector"
+  name_prefix                = var.name_prefix
+  tags                       = local.tags
+  acvm_instance_type         = var.acvm_instance_type
+  ac_count                   = var.ac_count
+  appuserdata                = local.appuserdata
+  app_connector_sg_id        = module.securitygroups.app_connector_security_group_id
+  aws_workload_subnet_ids    = module.network.workload_subnet_ids
+  app_instance_key           = var.app_instance_key
 }
