@@ -1,5 +1,3 @@
-# Alternative account/environment scaffold; select using TG_ACCOUNT_CONFIG.
-# Set TF_STATE_KEY to an environment-specific path when sharing an account.
 inputs = {}
 
 remote_state {
