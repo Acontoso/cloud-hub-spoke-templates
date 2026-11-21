@@ -4,7 +4,7 @@
 resource "aws_security_group" "cc_mgmt_sg" {
   name        = "${var.name_prefix}-cc-mgmt-sg"
   description = "Security group for Cloud Connector management interface"
-  vpc_id      = aws_vpc.vpc.id
+  vpc_id      = var.vpc_id
 
   tags = merge(var.tags,
     { Name = "${var.name_prefix}-cc-mgmt-sg" }
@@ -16,17 +16,10 @@ resource "aws_security_group" "cc_mgmt_sg" {
 }
 
 resource "aws_vpc_security_group_ingress_rule" "cc_mgmt_ingress_ssh" {
-  description       = "SSH to CC management"
+  for_each          = toset(var.management_cidrs)
+  description       = "SSH to CC management from an explicit allowed network"
   security_group_id = aws_security_group.cc_mgmt_sg.id
-  cidr_ipv4         = var.vpc_id
-  from_port         = 22
-  ip_protocol       = "tcp"
-  to_port           = 22
-}
-
-resource "aws_vpc_security_group_ingress_rule" "cc_mgmt_ingress_ssh_dev" {
-  security_group_id = aws_security_group.cc_mgmt_sg.id
-  cidr_ipv4         = "10.200.6.105/32"
+  cidr_ipv4         = each.value
   from_port         = 22
   ip_protocol       = "tcp"
   to_port           = 22
@@ -84,7 +77,7 @@ resource "aws_vpc_security_group_egress_rule" "egress_cc_mgmt_tcp_12002" {
 resource "aws_security_group" "cc_service_sg" {
   name        = "${var.name_prefix}-cc-svc-sg"
   description = "Security group for Cloud Connector service interfaces"
-  vpc_id      = aws_vpc.vpc.id
+  vpc_id      = var.vpc_id
 
   tags = merge(var.tags,
     { Name = "${var.name_prefix}-cc-svc-sg" }
@@ -99,7 +92,7 @@ resource "aws_security_group" "cc_service_sg" {
 resource "aws_vpc_security_group_ingress_rule" "ingress_cc_service_health_check" {
   description       = "CC Service TCP health probe"
   security_group_id = aws_security_group.cc_service_sg.id
-  cidr_ipv4         = var.vpc_id
+  cidr_ipv4         = var.vpc_cidr
   from_port         = var.http_probe_port
   ip_protocol       = "tcp"
   to_port           = var.http_probe_port
@@ -108,7 +101,7 @@ resource "aws_vpc_security_group_ingress_rule" "ingress_cc_service_health_check"
 resource "aws_vpc_security_group_ingress_rule" "ingress_cc_service_https_local" {
   description       = "CC inbound internal VPC cluster TCP 443 communication"
   security_group_id = aws_security_group.cc_service_sg.id
-  cidr_ipv4         = var.vpc_id
+  cidr_ipv4         = var.vpc_cidr
   from_port         = 443
   ip_protocol       = "tcp"
   to_port           = 443
@@ -155,7 +148,7 @@ resource "aws_vpc_security_group_egress_rule" "egress_cc_service_udp_53" {
 resource "aws_vpc_security_group_ingress_rule" "ingress_cc_service_geneve" {
   description       = "CC GENEVE encapsulation traffic to CC Service from GWLB"
   security_group_id = aws_security_group.cc_service_sg.id
-  cidr_ipv4         = var.vpc_id
+  cidr_ipv4         = var.vpc_cidr
   from_port         = 6081
   ip_protocol       = "udp"
   to_port           = 6081
@@ -164,7 +157,7 @@ resource "aws_vpc_security_group_ingress_rule" "ingress_cc_service_geneve" {
 resource "aws_vpc_security_group_egress_rule" "egress_cc_service_geneve" {
   description       = "CC GENEVE encapsulation traffic to GWLB from CC Service"
   security_group_id = aws_security_group.cc_service_sg.id
-  cidr_ipv4         = var.vpc_id
+  cidr_ipv4         = var.vpc_cidr
   from_port         = 6081
   ip_protocol       = "udp"
   to_port           = 6081
@@ -181,7 +174,7 @@ resource "aws_vpc_security_group_egress_rule" "egress_cc_service_all" {
 resource "aws_security_group" "ac_sg" {
   name        = "${var.name_prefix}-ac-sg"
   description = "Security group for App Connector interface"
-  vpc_id      = aws_vpc.vpc.id
+  vpc_id      = var.vpc_id
 
   egress {
     from_port   = 0

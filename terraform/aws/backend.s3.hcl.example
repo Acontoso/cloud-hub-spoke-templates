@@ -1,0 +1,11 @@
+# Non-secret example backend configuration; replace all deployment-specific values.
+# Credentials must come from the environment's approved AWS credential chain.
+bucket       = "replace-with-private-versioned-state-bucket"
+key          = "hub-spoke/development/aws/terraform.tfstate"
+region       = "ap-southeast-2"
+encrypt      = true
+use_lockfile = true
+
+# Optional customer-managed backend encryption key. Its policy must authorize the
+# deployment identity, independently of appliance EBS/provisioning KMS permissions.
+# kms_key_id = "arn:aws:kms:ap-southeast-2:111122223333:key/replace-with-key-id"

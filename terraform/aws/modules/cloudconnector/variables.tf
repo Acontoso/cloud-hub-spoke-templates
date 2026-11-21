@@ -1,163 +1,121 @@
-variable "tags" {
-  description = "Generic tags map"
-  type        = map(string)
-  default     = {}
+variable "name_prefix" {
+  description = "Prefix for appliance and interface names."
+  type        = string
+  nullable    = false
 }
 
-variable "name_prefix" {
-  type        = string
-  description = "A prefix to associate to all the network module resources"
-  default     = null
+variable "tags" {
+  description = "Additional tags applied to supported resources."
+  type        = map(string)
+  default     = {}
+  nullable    = false
 }
 
 variable "ccvm_instance_type" {
+  description = "Marketplace-supported instance type matching the Zscaler provisioning template."
   type        = string
-  description = "Cloud Connector Instance Type"
   default     = "m6i.large"
-  validation {
-    condition = (
-      var.ccvm_instance_type == "t3.medium" ||
-      var.ccvm_instance_type == "m6i.large" ||
-      var.ccvm_instance_type == "c6i.large" ||
-      var.ccvm_instance_type == "c6in.large" ||
-      var.ccvm_instance_type == "m6i.4xlarge" ||
-      var.ccvm_instance_type == "c6i.4xlarge" ||
-      var.ccvm_instance_type == "c6in.4xlarge"
-    )
-    error_message = "Input ccvm_instance_type must be set to an approved vm instance type."
-  }
-}
 
-variable "ebs_encryption_enabled" {
-  type        = bool
-  description = "true/false whether to enable EBS encryption on the root volume. Default is true"
-  default     = true
+  validation {
+    condition     = contains(["t3.medium", "m6i.large", "c6i.large", "c6in.large", "m6i.4xlarge", "c6i.4xlarge", "c6in.4xlarge"], var.ccvm_instance_type)
+    error_message = "Choose a supported Cloud Connector instance type."
+  }
 }
 
 variable "cc_count" {
+  description = "Total appliance count, distributed round-robin across the supplied subnets."
   type        = number
-  description = "Default number of Cloud Connector appliances to create"
   default     = 3
+
+  validation {
+    condition     = var.cc_count >= 1 && var.cc_count == floor(var.cc_count)
+    error_message = "cc_count must be a positive integer."
+  }
 }
 
-variable "zssupport_server" {
+variable "ami_id" {
+  description = "Pinned Cloud Connector AMI ID. Null discovers the latest subscribed Marketplace image."
   type        = string
-  description = "destination IP address of Zscaler Support access server. IP resolution of remotesupport.<zscaler_customer_cloud>.net"
-  default     = "199.168.148.101/32"
-}
+  default     = null
 
-variable "ebs_volume_type" {
-  type        = string
-  description = "(Optional) Type of volume. Valid values include standard, gp2, gp3, io1, io2, sc1, or st1. Defaults to gp3"
-  default     = "gp3"
+  validation {
+    condition     = var.ami_id == null ? true : can(regex("^ami-[0-9a-f]+$", var.ami_id))
+    error_message = "ami_id must be an AMI ID or null."
+  }
 }
 
 variable "instance_key" {
+  description = "Optional existing EC2 key-pair name. Null disables key-pair injection."
   type        = string
-  description = "SSH Key for instances"
+  default     = null
 }
 
-variable "min_size" {
-  type        = number
-  description = "Mininum number of Cloud Connectors to maintain in Autoscaling group"
-  default     = 1
-}
+variable "iam_instance_profile_name" {
+  description = "Existing instance-profile name granting appliance bootstrap and management permissions."
+  type        = string
+  nullable    = false
 
-variable "max_size" {
-  type        = number
-  description = "Maxinum number of Cloud Connectors to maintain in Autoscaling group"
-  default     = 2
   validation {
-    condition = (
-      var.max_size >= 1 && var.max_size <= 10
-    )
-    error_message = "Input max_size must be set to a number between 1 and 10."
+    condition     = length(trimspace(var.iam_instance_profile_name)) > 0
+    error_message = "iam_instance_profile_name must not be empty."
   }
-}
-
-variable "health_check_grace_period" {
-  type        = number
-  description = "The health check grace period specifies the minimum amount of time (in seconds) to keep a new instance in service before terminating it if it's found to be unhealthy."
-  default     = 900
-}
-
-variable "instance_warmup" {
-  type        = number
-  description = "Amount of time, in seconds, until a newly launched instance can contribute to the Amazon CloudWatch metrics. This delay lets an instance finish initializing before Amazon EC2 Auto Scaling aggregates instance metrics, resulting in more reliable usage data. Set this value equal to the amount of time that it takes for resource consumption to become stable after an instance reaches the InService state"
-  default     = 60
-}
-
-variable "health_check_type" {
-  type        = string
-  description = "EC2 or ELB. Controls how health checking is done"
-  default     = "ELB"
-  validation {
-    condition = (
-      var.health_check_type == "EC2" ||
-      var.health_check_type == "ELB"
-    )
-    error_message = "Input health_check_type must be set to an approved predefined metric."
-  }
-}
-
-variable "launch_template_version" {
-  type        = string
-  description = "Launch template version. Can be version number, `$Latest` or `$Default`"
-  default     = "$Latest"
-}
-
-variable "target_cpu_util_value" {
-  type        = number
-  description = "Target value number for autoscaling policy CPU utilization target tracking. ie: trigger a scale in/out to keep average CPU Utliization percentage across all instances at/under this number"
-  default     = 80
-}
-
-variable "lifecyclehook_instance_launch_wait_time" {
-  type        = number
-  description = "The maximum amount of time to wait in pending:wait state on instance launch in warmpool"
-  default     = 1800
-}
-
-variable "lifecyclehook_instance_terminate_wait_time" {
-  type        = number
-  description = "The maximum amount of time to wait in terminating:wait state on instance termination"
-  default     = 900
-}
-
-variable "protect_from_scale_in" {
-  type        = bool
-  description = "Whether newly launched instances are automatically protected from termination by Amazon EC2 Auto Scaling when scaling in. For more information about preventing instances from terminating on scale in, see Using instance scale-in protection in the Amazon EC2 Auto Scaling User Guide"
-  default     = false
-}
-
-variable "wait_for_capacity_timeout" {
-  type        = string
-  description = "Maximum duration that Terraform should wait for ASG instances to be healthy before timing out"
-  default     = "0"
-}
-
-variable "zonal_asg_enabled" {
-  type        = bool
-  description = "The number of Auto Scaling Groups to create. By default, Terraform will create a single Auto Scaling Group containing multiple subnets/availability zones. Set to true if you would rather create one Auto Scaling Group per subnet/availability zone (var.az_count)"
-  default     = true
 }
 
 variable "userdata" {
+  description = "Raw appliance bootstrap configuration, not base64 encoded. Supply references, never secret values."
   type        = string
-  description = "User data script to configure the instance to dynamically onboard into Zscaler"
+  sensitive   = true
+  nullable    = false
 }
 
 variable "aws_cc_subnet_ids" {
+  description = "Ordered non-empty subnet list; both interfaces of each appliance use its assigned subnet."
   type        = list(string)
-  description = "List of subnet IDs for Cloud Connector instances"
+  nullable    = false
+
+  validation {
+    condition     = length(var.aws_cc_subnet_ids) > 0 && length(distinct(var.aws_cc_subnet_ids)) == length(var.aws_cc_subnet_ids)
+    error_message = "aws_cc_subnet_ids must contain at least one subnet without duplicates."
+  }
 }
 
 variable "service_interface_sg_id" {
+  description = "Security group for the forwarding interface."
   type        = string
-  description = "Security group ID for Cloud Connector service interfaces"
+  nullable    = false
 }
 
 variable "management_interface_sg_id" {
+  description = "Security group for the management interface."
   type        = string
-  description = "Security group ID for Cloud Connector management interfaces"
+  nullable    = false
+}
+
+variable "ebs_encryption_enabled" {
+  description = "Whether root EBS volumes are encrypted. Keep enabled outside explicitly approved exceptions."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
+variable "kms_key_arn" {
+  description = "Optional customer-managed EBS KMS key ARN. Null uses the account default EBS key."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.kms_key_arn == null || var.ebs_encryption_enabled
+    error_message = "A kms_key_arn requires ebs_encryption_enabled = true."
+  }
+}
+
+variable "ebs_volume_type" {
+  description = "General-purpose SSD root-volume type."
+  type        = string
+  default     = "gp3"
+
+  validation {
+    condition     = contains(["gp2", "gp3"], var.ebs_volume_type)
+    error_message = "ebs_volume_type must be gp2 or gp3."
+  }
 }

@@ -1,3 +1,4 @@
-include {
-    path = "env/${get_aws_account_id()}-terragrunt.hcl"
+# Select an account-specific configuration explicitly; do not infer a missing file name.
+include "account" {
+  path = get_env("TG_ACCOUNT_CONFIG")
 }

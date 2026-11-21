@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euo pipefail
+umask 077
+
+# AWS CLI must be included in the approved appliance image. Never enable shell tracing.
+command -v aws >/dev/null 2>&1 || { printf '%s\n' 'App Connector bootstrap requires AWS CLI.' >&2; exit 1; }
+export AWS_DEFAULT_REGION='${region}'
+export AWS_RETRY_MODE=standard
+export AWS_MAX_ATTEMPTS=10
+export AWS_PAGER=''
+
+systemctl stop zpa-connector
+provisioning_dir=/opt/zscaler/var
+[[ -d "$provisioning_dir" ]] || { printf '%s\n' 'App Connector provisioning directory is missing.' >&2; exit 1; }
+provisioning_file=$(mktemp "$provisioning_dir/.provision_key.XXXXXX")
+trap 'rm -f "$provisioning_file"' EXIT
+
+aws ssm get-parameter \
+  --name '${parameter_name}' \
+  --with-decryption \
+  --query 'Parameter.Value' \
+  --output text > "$provisioning_file"
+[[ -s "$provisioning_file" ]] || { printf '%s\n' 'SSM returned an empty provisioning key.' >&2; exit 1; }
+chown --reference="$provisioning_dir" "$provisioning_file"
+chmod 0600 "$provisioning_file"
+mv -f "$provisioning_file" "$provisioning_dir/provision_key"
+
+systemctl start zpa-connector

@@ -1,0 +1,43 @@
+# Copy to terraform.tfvars and replace identifiers with environment-specific values.
+# Never put provisioning keys, credentials, or decrypted secret values in this file.
+aws_region  = "ap-southeast-2"
+name_prefix = "inspection-dev"
+environment = "development"
+cost_centre = "network-platform"
+
+tags = {
+  Owner = "platform-team"
+}
+
+vpc_cidr           = "10.80.0.0/16"
+az_count           = 3
+availability_zones = ["ap-southeast-2a", "ap-southeast-2b", "ap-southeast-2c"]
+public_subnets     = ["10.80.0.0/24", "10.80.1.0/24", "10.80.2.0/24"]
+cc_subnets         = ["10.80.10.0/24", "10.80.11.0/24", "10.80.12.0/24"]
+workload_subnets   = ["10.80.20.0/24", "10.80.21.0/24", "10.80.22.0/24"]
+tgw_subnets        = ["10.80.30.0/28", "10.80.30.16/28", "10.80.30.32/28"]
+
+# No TGW is created. Supply its ID only after arranging the VPC attachment and routing.
+transit_gateway_id = null
+static_routes_tgw  = []
+
+# SSH is disabled by default. Add only approved private management source CIDRs.
+management_cidrs = []
+instance_key     = null
+app_instance_key = null
+
+cc_vm_prov_url = "https://replace-with-your-tenant.example.com/provision"
+secret_name    = "zscaler/cloudconnector/development"
+cc_count       = 3
+
+# For controlled rollouts, set explicit region-specific subscribed Marketplace AMIs.
+cc_ami_id = null
+ac_ami_id = null
+
+ac_count                 = 2
+ssm_zpa_provisioning_key  = "/zscaler/appconnector/development/provisioning-key"
+
+http_probe_port         = 50000
+health_check_interval   = 10
+flow_logs_enabled       = true
+flow_log_retention_days = 30

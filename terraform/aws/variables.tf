@@ -1,376 +1,322 @@
-variable "source_code_repo_url" {
+variable "aws_region" {
+  description = "AWS region for all resources in this deployment."
   type        = string
-  description = "Repository where IaC and Lambda function source code resides"
-}
+  default     = "ap-southeast-2"
+  nullable    = false
 
-variable "environment" {
-  description = "Environment the infrastructure is deployed in"
-  type        = string
-}
-
-variable "cost_centre" {
-  description = "Cost Centre tag value to be charged to"
-  type        = string
-}
-
-#####################VPC Variables##########################
-
-variable "vpc_cidr" {
-  description = "CIDR to allocate VPC too"
-  type        = string
+  validation {
+    condition     = can(regex("^[a-z]{2}(-[a-z]+)+-[0-9]+$", var.aws_region))
+    error_message = "aws_region must be an AWS region identifier."
+  }
 }
 
 variable "name_prefix" {
+  description = "Short deployment prefix used in resource names."
   type        = string
-  description = "A prefix to associate to all the network module resources"
+  default     = "inspection"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[a-zA-Z][a-zA-Z0-9-]{1,19}$", var.name_prefix))
+    error_message = "name_prefix must be 2–20 alphanumeric/hyphen characters starting with a letter."
+  }
+}
+
+variable "environment" {
+  description = "Environment classification, for example development, staging, or production."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = length(trimspace(var.environment)) > 0
+    error_message = "environment must not be empty."
+  }
+}
+
+variable "cost_centre" {
+  description = "Cost allocation identifier."
+  type        = string
+  default     = "unassigned"
+  nullable    = false
+}
+
+variable "source_code_repo_url" {
+  description = "Optional repository URL recorded as a resource tag."
+  type        = string
   default     = null
+}
+
+variable "tags" {
+  description = "Additional tags; caller values override deployment-level defaults."
+  type        = map(string)
+  default     = {}
+  nullable    = false
+}
+
+variable "vpc_cidr" {
+  description = "IPv4 CIDR allocated to the inspection VPC."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(cidrnetmask(var.vpc_cidr))
+    error_message = "vpc_cidr must be a valid IPv4 CIDR."
+  }
 }
 
 variable "public_subnets" {
+  description = "One public NAT subnet CIDR per selected AZ, in AZ order."
   type        = list(string)
-  description = "Public/NAT GW Subnets to create in Inspection VPC"
-  default     = null
+  nullable    = false
 }
 
 variable "cc_subnets" {
+  description = "One Cloud Connector and GWLB endpoint subnet CIDR per AZ, in AZ order."
   type        = list(string)
-  description = "Cloud Connector Subnets to create in Inspection VPC"
-  default     = null
+  nullable    = false
 }
 
 variable "workload_subnets" {
+  description = "One workload/App Connector subnet CIDR per AZ, in AZ order."
   type        = list(string)
-  description = "Workload Subnets to create in Inspection VPC"
-  default     = null
+  nullable    = false
 }
 
 variable "tgw_subnets" {
+  description = "One reserved Transit Gateway attachment subnet CIDR per AZ, in AZ order."
   type        = list(string)
-  description = "TGW Subnets to create in Inspection VPC"
-  default     = null
+  nullable    = false
 }
 
 variable "az_count" {
+  description = "Number of availability zones. Use at least two for an available deployment."
   type        = number
-  description = "Default number of subnets to create based on availability zone input"
   default     = 3
+
   validation {
-    condition = (
-      (var.az_count >= 1 && var.az_count <= 3)
-    )
-    error_message = "Input az_count must be set to a single value between 1 and 3. Note* some regions have greater than 3 AZs. Please modify az_count validation in variables.tf if you are utilizing more than 3 AZs in a region that supports it. https://aws.amazon.com/about-aws/global-infrastructure/regions_az/."
+    condition     = var.az_count >= 1 && var.az_count <= 6 && var.az_count == floor(var.az_count)
+    error_message = "az_count must be an integer from 1 to 6."
   }
 }
 
-variable "static_routes_tgw" {
+variable "availability_zones" {
+  description = "Optional explicit AZ order. Empty discovers available AZs; pin this for existing deployments."
   type        = list(string)
-  description = "List of routes that are available through transit gateway"
+  default     = []
+  nullable    = false
+}
+
+variable "transit_gateway_id" {
+  description = "Existing Transit Gateway ID. The gateway, VPC attachment, and TGW routing are caller-managed."
+  type        = string
   default     = null
 }
 
-######################Cloud Connector Variables##########################
+variable "static_routes_tgw" {
+  description = "Non-default IPv4 destinations routed to the existing TGW from private route tables."
+  type        = list(string)
+  default     = []
+  nullable    = false
+}
+
+variable "management_cidrs" {
+  description = "Explicit private-source CIDR allowlist for appliance SSH. Empty creates no SSH ingress rules."
+  type        = list(string)
+  default     = []
+  nullable    = false
+}
+
+variable "flow_logs_enabled" {
+  description = "Enable inspection VPC flow logs in CloudWatch Logs; incurs logging charges."
+  type        = bool
+  default     = true
+  nullable    = false
+}
+
+variable "flow_log_retention_days" {
+  description = "CloudWatch retention period for VPC flow logs."
+  type        = number
+  default     = 30
+}
+
 variable "cc_vm_prov_url" {
+  description = "HTTPS Cloud Connector provisioning URL from the Zscaler portal."
   type        = string
-  description = "Zscaler Cloud Connector Provisioning URL"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^https://[^[:space:]]+$", var.cc_vm_prov_url))
+    error_message = "cc_vm_prov_url must be an HTTPS URL without whitespace."
+  }
 }
 
 variable "secret_name" {
+  description = "Existing Secrets Manager provisioning-secret name; never supply the secret value."
   type        = string
-  description = "AWS Secrets Manager Secret Name for Cloud Connector provisioning"
-}
+  nullable    = false
 
-variable "http_probe_port" {
-  type        = number
-  description = "Port number for Cloud Connector cloud init to enable listener port for HTTP probe from GWLB Target Group"
-  default     = 50000
-}
-
-variable "cc_instance_size" {
-  type        = string
-  description = "Cloud Connector Instance size. Determined by and needs to match the Cloud Connector Portal provisioning template configuration"
-  default     = "small"
   validation {
-    condition = (
-      var.cc_instance_size == "small" ||
-      var.cc_instance_size == "medium" ||
-      var.cc_instance_size == "large"
-    )
-    error_message = "Input cc_instance_size must be set to an approved cc instance type."
+    condition     = can(regex("^[a-zA-Z0-9/_+=.@-]+$", var.secret_name))
+    error_message = "secret_name must be a non-empty Secrets Manager friendly name without whitespace."
   }
+}
+
+variable "secret_kms_key_arn" {
+  description = "Optional customer-managed KMS key ARN encrypting the Cloud Connector secret."
+  type        = string
+  default     = null
 }
 
 variable "ccvm_instance_type" {
+  description = "Cloud Connector instance type matching its Zscaler provisioning template."
   type        = string
-  description = "Cloud Connector Instance Type"
   default     = "m6i.large"
-  validation {
-    condition = (
-      var.ccvm_instance_type == "t3.medium" ||
-      var.ccvm_instance_type == "m6i.large" ||
-      var.ccvm_instance_type == "c6i.large" ||
-      var.ccvm_instance_type == "c6in.large" ||
-      var.ccvm_instance_type == "m6i.4xlarge" ||
-      var.ccvm_instance_type == "c6i.4xlarge" ||
-      var.ccvm_instance_type == "c6in.4xlarge"
-    )
-    error_message = "Input ccvm_instance_type must be set to an approved vm instance type."
-  }
-}
-
-variable "ebs_encryption_enabled" {
-  type        = bool
-  description = "true/false whether to enable EBS encryption on the root volume. Default is true"
-  default     = true
 }
 
 variable "cc_count" {
+  description = "Total Cloud Connector count. Placement cycles through the selected subnets."
   type        = number
-  description = "Default number of Cloud Connector appliances to create"
   default     = 3
+
+  validation {
+    condition     = var.cc_count >= var.az_count && var.cc_count == floor(var.cc_count)
+    error_message = "cc_count must be an integer providing at least one connector per selected AZ."
+  }
 }
 
-variable "zssupport_server" {
+variable "cc_ami_id" {
+  description = "Optional pinned regional Cloud Connector AMI. Null discovers the latest Marketplace image."
   type        = string
-  description = "destination IP address of Zscaler Support access server. IP resolution of remotesupport.<zscaler_customer_cloud>.net"
-  default     = "199.168.148.101/32"
-}
-
-variable "ebs_volume_type" {
-  type        = string
-  description = "(Optional) Type of volume. Valid values include standard, gp2, gp3, io1, io2, sc1, or st1. Defaults to gp3"
-  default     = "gp3"
+  default     = null
 }
 
 variable "instance_key" {
+  description = "Optional existing Cloud Connector EC2 key-pair name."
   type        = string
-  description = "SSH Key for instances"
+  default     = null
 }
 
-variable "min_size" {
-  type        = number
-  description = "Mininum number of Cloud Connectors to maintain in Autoscaling group"
-  default     = 1
-}
-
-variable "max_size" {
-  type        = number
-  description = "Maxinum number of Cloud Connectors to maintain in Autoscaling group"
-  default     = 2
-  validation {
-    condition = (
-      var.max_size >= 1 && var.max_size <= 10
-    )
-    error_message = "Input max_size must be set to a number between 1 and 10."
-  }
-}
-
-variable "health_check_grace_period" {
-  type        = number
-  description = "The health check grace period specifies the minimum amount of time (in seconds) to keep a new instance in service before terminating it if it's found to be unhealthy."
-  default     = 900
-}
-
-variable "instance_warmup" {
-  type        = number
-  description = "Amount of time, in seconds, until a newly launched instance can contribute to the Amazon CloudWatch metrics. This delay lets an instance finish initializing before Amazon EC2 Auto Scaling aggregates instance metrics, resulting in more reliable usage data. Set this value equal to the amount of time that it takes for resource consumption to become stable after an instance reaches the InService state"
-  default     = 60
-}
-
-variable "health_check_type" {
-  type        = string
-  description = "EC2 or ELB. Controls how health checking is done"
-  default     = "ELB"
-  validation {
-    condition = (
-      var.health_check_type == "EC2" ||
-      var.health_check_type == "ELB"
-    )
-    error_message = "Input health_check_type must be set to an approved predefined metric."
-  }
-}
-
-variable "launch_template_version" {
-  type        = string
-  description = "Launch template version. Can be version number, `$Latest` or `$Default`"
-  default     = "$Latest"
-}
-
-variable "target_cpu_util_value" {
-  type        = number
-  description = "Target value number for autoscaling policy CPU utilization target tracking. ie: trigger a scale in/out to keep average CPU Utliization percentage across all instances at/under this number"
-  default     = 80
-}
-
-variable "lifecyclehook_instance_launch_wait_time" {
-  type        = number
-  description = "The maximum amount of time to wait in pending:wait state on instance launch in warmpool"
-  default     = 1800
-}
-
-variable "lifecyclehook_instance_terminate_wait_time" {
-  type        = number
-  description = "The maximum amount of time to wait in terminating:wait state on instance termination"
-  default     = 900
-}
-
-variable "protect_from_scale_in" {
+variable "ebs_encryption_enabled" {
+  description = "Encrypt Cloud Connector root volumes. App Connector root volumes are always encrypted."
   type        = bool
-  description = "Whether newly launched instances are automatically protected from termination by Amazon EC2 Auto Scaling when scaling in. For more information about preventing instances from terminating on scale in, see Using instance scale-in protection in the Amazon EC2 Auto Scaling User Guide"
-  default     = false
-}
-
-variable "wait_for_capacity_timeout" {
-  type        = string
-  description = "Maximum duration that Terraform should wait for ASG instances to be healthy before timing out"
-  default     = "0"
-}
-
-variable "zonal_asg_enabled" {
-  type        = bool
-  description = "The number of Auto Scaling Groups to create. By default, Terraform will create a single Auto Scaling Group containing multiple subnets/availability zones. Set to true if you would rather create one Auto Scaling Group per subnet/availability zone (var.az_count)"
   default     = true
+  nullable    = false
 }
 
-#######################GWLB Variables##########################
+variable "ebs_kms_key_arn" {
+  description = "Optional customer-managed EBS key ARN shared by appliance root volumes."
+  type        = string
+  default     = null
+}
+
+variable "ebs_volume_type" {
+  description = "Cloud Connector root-volume type: gp2 or gp3."
+  type        = string
+  default     = "gp3"
+}
+
+variable "http_probe_port" {
+  description = "Cloud Connector HTTP health-probe port; also rendered into appliance bootstrap."
+  type        = number
+  default     = 50000
+
+  validation {
+    condition     = var.http_probe_port >= 1 && var.http_probe_port <= 65535 && var.http_probe_port == floor(var.http_probe_port)
+    error_message = "http_probe_port must be an integer from 1 to 65535."
+  }
+}
+
+variable "gwlb_name" {
+  description = "Optional GWLB name. Null derives a name from name_prefix."
+  type        = string
+  default     = null
+}
+
+variable "target_group_name" {
+  description = "Optional GWLB target-group name. Null derives a name from name_prefix."
+  type        = string
+  default     = null
+}
 
 variable "health_check_interval" {
+  description = "GWLB health-probe interval in seconds: 10 or 30."
   type        = number
-  description = "Interval for GWLB target group health check probing, in seconds, of Cloud Connector targets. Minimum 5 and maximum 300 seconds"
-  default     = 5
+  default     = 10
+
+  validation {
+    condition     = contains([10, 30], var.health_check_interval)
+    error_message = "health_check_interval must be 10 or 30 seconds."
+  }
 }
 
 variable "healthy_threshold" {
+  description = "Successful probes before a GWLB target becomes healthy."
   type        = number
-  description = "The number of successful health checks required before an unhealthy target becomes healthy. Minimum 2 and maximum 10"
   default     = 2
 }
 
 variable "unhealthy_threshold" {
+  description = "Failed probes before a GWLB target becomes unhealthy."
   type        = number
-  description = "The number of unsuccessful health checks required before an healthy target becomes unhealthy. Minimum 2 and maximum 10"
   default     = 3
 }
 
 variable "cross_zone_lb_enabled" {
+  description = "Allow GWLB distribution to targets in other AZs; cross-AZ charges may apply."
   type        = bool
-  description = "Determines whether GWLB cross zone load balancing should be enabled or not"
   default     = true
-}
-
-variable "gwlb_name" {
-  type        = string
-  description = "GWLB resource and tag name"
-}
-
-variable "target_group_name" {
-  type        = string
-  description = "GWLB Target Group resource name"
 }
 
 variable "deregistration_delay" {
+  description = "GWLB target deregistration delay in seconds."
   type        = number
-  description = "Amount time for Elastic Load Balancing to wait before changing the state of a deregistering target from draining to unused. The range is 0-3600 seconds."
-  default     = 0
+  default     = 30
 }
 
 variable "flow_stickiness" {
+  description = "GWLB affinity tuple: 2-tuple, 3-tuple, or 5-tuple."
   type        = string
-  description = "Options are (Default) 5-tuple (src ip/src port/dest ip/dest port/protocol), 3-tuple (src ip/dest ip/protocol), or 2-tuple (src ip/dest ip)"
   default     = "5-tuple"
-
-  validation {
-    condition = (
-      var.flow_stickiness == "2-tuple" ||
-      var.flow_stickiness == "3-tuple" ||
-      var.flow_stickiness == "5-tuple"
-    )
-    error_message = "Input flow_stickiness must be set to an approved value of either 5-tuple, 3-tuple, or 2-tuple."
-  }
 }
 
 variable "rebalance_enabled" {
+  description = "Rebalance existing flows when a GWLB target is unhealthy or deregistered."
   type        = bool
-  description = "Indicates how the GWLB handles existing flows when a target is deregistered or marked unhealthy. true means rebalance. false means no_rebalance. Default: true"
   default     = true
-}
-########################Private Access Variables##########################
-variable "app_instance_key" {
-  type        = string
-  description = "SSH Key for instances"
 }
 
 variable "ac_count" {
+  description = "Total App Connector count, distributed across workload subnets."
   type        = number
-  description = "Default number of App Connector appliances to create"
   default     = 2
 }
 
 variable "acvm_instance_type" {
+  description = "Marketplace-supported App Connector instance type."
   type        = string
-  description = "App Connector Instance Type"
   default     = "t3.medium"
-  validation {
-    condition = (
-      var.acvm_instance_type == "t3.medium" ||
-      var.acvm_instance_type == "t3.large" ||
-      var.acvm_instance_type == "t3.xlarge" ||
-      var.acvm_instance_type == "t3a.medium" ||
-      var.acvm_instance_type == "t3a.large" ||
-      var.acvm_instance_type == "t3a.xlarge" ||
-      var.acvm_instance_type == "t3a.2xlarge" ||
-      var.acvm_instance_type == "m5.large" ||
-      var.acvm_instance_type == "m5.xlarge" ||
-      var.acvm_instance_type == "m5.2xlarge" ||
-      var.acvm_instance_type == "m5.4xlarge" ||
-      var.acvm_instance_type == "m5a.large" ||
-      var.acvm_instance_type == "m5a.xlarge" ||
-      var.acvm_instance_type == "m5a.2xlarge" ||
-      var.acvm_instance_type == "m5a.4xlarge" ||
-      var.acvm_instance_type == "m5n.large" ||
-      var.acvm_instance_type == "m5n.xlarge" ||
-      var.acvm_instance_type == "m5n.2xlarge" ||
-      var.acvm_instance_type == "m5n.4xlarge"
-    )
-    error_message = "Input acvm_instance_type must be set to an approved vm instance type."
-  }
+}
+
+variable "ac_ami_id" {
+  description = "Optional pinned regional App Connector AMI. Null discovers the latest Marketplace image."
+  type        = string
+  default     = null
+}
+
+variable "app_instance_key" {
+  description = "Optional existing App Connector EC2 key-pair name."
+  type        = string
+  default     = null
 }
 
 variable "ssm_zpa_provisioning_key" {
+  description = "Existing SSM SecureString parameter name/path for App Connector provisioning, not its value."
   type        = string
-  description = "SSM Parameter that stores the provisioning key for Zscaler Private Access App Connector"
+  nullable    = false
 }
 
-########################ASG Lambda Variables##########################
-variable "asg_lambda_filename" {
+variable "app_provisioning_kms_key_arn" {
+  description = "Optional customer-managed KMS key ARN encrypting the App Connector parameter."
   type        = string
-  description = "Name of the lambda zip file without zip suffix"
-  default     = "zscaler_cc_lambda_service"
-}
-
-variable "log_group_retention_days" {
-  type        = number
-  description = "Specifies the number of days you want to retain log events in the specified log group. Possible values are: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288, 3653, and 0"
-  default     = 3
-}
-
-variable "architecture" {
-  description = "The architecture for the Lambda function (x86_64 or arm64)"
-  type        = string
-  default     = "x86_64"
-
-  validation {
-    condition     = contains(["x86_64", "arm64"], var.architecture)
-    error_message = "Invalid architecture. Must be either 'x86_64' or 'arm64'."
-  }
-}
-
-variable "runtime" {
-  description = "The runtime for the Lambda function (python3.11 or python3.12)"
-  type        = string
-  default     = "python3.12"
-
-  validation {
-    condition     = contains(["python3.11", "python3.12"], var.runtime)
-    error_message = "Invalid architecture. Must be either 'python3.11' or 'python3.12'."
-  }
+  default     = null
 }

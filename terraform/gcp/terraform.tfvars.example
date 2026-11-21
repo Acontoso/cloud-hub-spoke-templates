@@ -1,0 +1,43 @@
+# Copy this file to terraform.tfvars (or pass with -var-file) and replace the
+# placeholder values. Do not commit real secrets or private keys.
+
+project     = "my-gcp-project"
+region      = "australia-southeast1"
+name_prefix = "zsz-hub"
+
+# Non-overlapping IPv4 ranges. The load balancer VIP defaults to the
+# second-to-last usable address in subnet_cc_service.
+subnet_cc_service = "10.10.0.0/24"
+subnet_mgmt       = "10.10.1.0/24"
+
+# Pin the VIP explicitly if it must never move.
+# reserved_internal_address = "10.10.0.254"
+
+cc_vm_prov_url = "https://cc.example.zscaler.net/api/v1/provisioning"
+secret_name    = "zscaler-cc-provisioning"
+# secret_project = "my-secret-project"
+
+# OpenSSH public key for the zsroot user.
+ssh_key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyReplaceMe user@example"
+
+# Optional: pin zones instead of letting the module discover them. When set,
+# this list determines the number of zonal instance groups.
+# zones = ["australia-southeast1-a", "australia-southeast1-b", "australia-southeast1-c"]
+
+# Optional: limit region-local instance groups when zones is empty.
+# az_count = 3
+# cc_count = 1
+
+# Caller labels override the built-in defaults (terraform = "true").
+# labels = {
+#   owner       = "network-security"
+#   environment = "production"
+# }
+
+# Optional: pin a newer Zscaler Cloud Connector image.
+# source_image_name = "zs-cc-ga-02022025"
+
+# Partner integrations are opt-in. Prefer topic-scoped grants.
+# enable_partner_integrations = true
+# partner_integrations_pubsub_role = "roles/pubsub.publisher"
+# partner_integrations_pubsub_topics = ["zscaler-cc-partner-integration"]
